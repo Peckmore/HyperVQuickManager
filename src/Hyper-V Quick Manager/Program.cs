@@ -1,52 +1,76 @@
-﻿/*
- * Project inspiration - https://blogs.msdn.microsoft.com/jorman/2010/01/24/hyper-v-manager/
- * Service installer code example - https://stackoverflow.com/a/1195621/
- * Hyper-V WMI Provider API - https://docs.microsoft.com/en-gb/previous-versions/windows/desktop/virtual/windows-virtualization-portal
- * Hyper-V WMI Provider (v2) API - https://docs.microsoft.com/en-gb/windows/desktop/HyperV_v2/windows-virtualization-portal
- */
-
-using HyperVQuickManager.Properties;
-using Microsoft.WindowsAPICodePack.Dialogs;
+﻿using Microsoft.Toolkit.Uwp.Notifications;
+using Microsoft.Win32;
 using System;
-using System.Collections;
-using System.Configuration.Install;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.ServiceProcess;
+using System.Management;
 using System.Windows.Forms;
-using HyperVQuickManager.WindowsService;
 
-namespace HyperVQuickManager
+namespace HyperVTray
 {
     internal static class Program
     {
+        #region Constants
+
+        private const string ApplicationName = @"Hyper-V Tray";
+        private const int BalloonTipTimeout = 2500;
+        private static readonly ContextMenu ContextMenu;
+        private static readonly NotifyIcon NotifyIcon;
+        private static readonly ManagementEventWatcher WmiEventWatcher;
+        private static readonly ManagementScope WmiManagementScope;
+        private const int WmiRefreshInterval = 2;
+
+        #endregion
+
+        #region Fields
+
+        private static string? _hyperVInstallFolder;
+        private static string? _vmConnectPath;
+        private static string? _vmManagerPath;
+
+        #endregion
+
+        #region Construction
+
+        static Program()
+        {
+            ContextMenu = new ContextMenu();
+
+            NotifyIcon = new NotifyIcon();
+            NotifyIcon.DoubleClick += NotifyIcon_DoubleClick;
+            NotifyIcon.MouseClick += NotifyIcon_MouseClick;
+
+            // This is the root WMI path we will use, which varies depenUseV2WmiProviderwe use the v1 or v2 Hyper-V WMI provider.
+            var rootWmiPath = UseV2WmiProvider ? "ROOT\\virtualization\\v2" : "ROOT\\virtualization";
+
+            // Create a ManagementScope object and connect to it. This object defines
+            // the WMI path we are going to use for our WMI Event Watcher.
+            WmiManagementScope = new ManagementScope(rootWmiPath);
+
+            // Set up our WMI Event Watcher to monitor for changes in state to any Hyper-V
+            // virtual machine. The watcher will monitor for changes every X seconds, where
+            // X is a constant defined at the start of the class.
+            var query = new WqlEventQuery($"SELECT * FROM __InstanceOperationEvent WITHIN {WmiRefreshInterval} " +
+                                          $"WHERE TargetInstance ISA 'Msvm_ComputerSystem' " +
+                                          $"AND TargetInstance.EnabledState <> PreviousInstance.EnabledState");
+            WmiEventWatcher = new ManagementEventWatcher(query) { Scope = WmiManagementScope };
+            WmiEventWatcher.EventArrived += WmiEventWatcher_EventArrived;
+
+            SystemEvents.DisplaySettingsChanged += SystemEvents_DisplaySettingsChanged;
+        }
+
+        #endregion
+
         #region Properties
 
         /// <summary>
-        /// The display name of the application.
+        /// A property indicating whether we are going to use the v1 or v2 Hyper-V WMI Provider. This is set to true for any version of
+        /// Windows greater than 6.2 (i.e., Windows 8.1 and Windows Server 2012 R2 onwards).
         /// </summary>
-        internal static string ApplicationName => (Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyTitleAttribute), false).FirstOrDefault() as AssemblyTitleAttribute)?.Title;
-        /// <summary>
-        /// The name of the Named Pipe that is used by the application and Windows Service for communications.
-        /// </summary>
-        internal static string NamedPipeName => "HyperVQuickManager";
-        /// <summary>
-        /// The Service Display Name that will be used if the application is installed as a Windows Service.
-        /// </summary>
-        internal static string ServiceDisplayName => $"{ApplicationName} Service";
-        /// <summary>
-        /// The Service Name that will be used if the application is installed as a Windows Service.
-        /// </summary>
-        internal static string ServiceName => "vmqms";
-        /// <summary>
-        /// Specifies whether the program is running as a desktop application of a Windows Service.
-        /// </summary>
-        internal static bool UserInteractive { get; private set; }
-        /// <summary>
-        /// A property indicating whether we are going to use the v1 or v2 Hyper-V WMI Provider. This is set to true for any version of Windows greater than 6.2 (i.e., Windows 8.1 and Windows Server 2012 R2 onwards).
-        /// </summary>
-        internal static bool UseV2Api => Environment.OSVersion.Version > new Version(6, 2);
+        internal static bool UseV2WmiProvider => Environment.OSVersion.Version > new Version(6, 2);
 
         #endregion
 
@@ -54,292 +78,578 @@ namespace HyperVQuickManager
 
         #region Event Handlers
 
-        private static void TaskDialog_Opened(object sender, EventArgs e)
+        private static void ExitMenuItem_Click(object? sender, EventArgs e)
         {
-            // This is to fix a bug in the Windows API Code Pack.
-            // https://stackoverflow.com/a/22576707/2678851
-            if (sender is TaskDialog taskDialog)
+            NotifyIcon.Visible = false;
+            Application.Exit();
+        }
+        private static void NotifyIcon_DoubleClick(object? sender, EventArgs e)
+        {
+            OpenHyperVManager();
+        }
+        private static void NotifyIcon_MouseClick(object? sender, MouseEventArgs e)
+        {
+            GenerateContextMenu();
+            NotifyIcon.ShowContextMenu(ContextMenu);
+        }
+        private static void PauseMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
             {
-                taskDialog.Icon = taskDialog.Icon;
-                taskDialog.InstructionText = taskDialog.InstructionText;
+                if (!RequestVmStateChange(menuItem.Parent.Name, VmState.Quiesce))
+                {
+                    ShowError(string.Format(ResourceHelper.Message_PauseVMFailed, menuItem.Parent.Name));
+                }
+            }
+        }
+        private static void ResetMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (!RequestVmStateChange(menuItem.Parent.Name, VmState.Reset))
+                {
+                    ShowError(ResourceHelper.Message_ResetVMFailed, menuItem.Parent.Name);
+                }
+            }
+        }
+        private static void ResumeMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (!RequestVmStateChange(menuItem.Parent.Name, VmState.Enabled))
+                {
+                    ShowError(string.Format(ResourceHelper.Message_ResumeVMFailed, menuItem.Parent.Name));
+                }
+            }
+        }
+        private static void SaveMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (!RequestVmStateChange(menuItem.Parent.Name, VmState.Offline))
+                {
+                    ShowError(string.Format(ResourceHelper.Message_SaveStateVMFailed, menuItem.Parent.Name));
+                }
+            }
+        }
+        private static void ShutDownMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (!RequestVmShutdown(menuItem.Parent.Name))
+                {
+                    ShowError(string.Format(ResourceHelper.Message_ShutDownVMFailed, menuItem.Parent.Name));
+                }
+            }
+        }
+        private static void StartMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (!RequestVmStateChange(menuItem.Parent.Name, VmState.Enabled))
+                {
+                    ShowError(string.Format(ResourceHelper.Message_StartVMFailed, menuItem.Parent.Name));
+                }
+            }
+        }
+        private static void SystemEvents_DisplaySettingsChanged(object? sender, EventArgs e)
+        {
+            Debug.WriteLine("Display settings change detected.");
+
+            SetTrayIcon();
+        }
+        private static void TurnOffMenuItem_Click(object? sender, EventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+            {
+                if (!RequestVmStateChange(menuItem.Parent.Name, VmState.Disabled))
+                {
+                    ShowError(string.Format(ResourceHelper.Message_PowerOffVMFailed, menuItem.Parent.Name));
+                }
+            }
+        }
+        private static void WmiEventWatcher_EventArrived(object? sender, EventArrivedEventArgs e)
+        {
+            // If the WMI Event Watcher has fired an event, check that the args contain a ManagementBaseObject.
+            if (e.NewEvent["TargetInstance"] is ManagementBaseObject virtualMachine)
+            {
+                // Filter out "noisy" states, to just show important ones.
+                var vmState = (VmState)(ushort)virtualMachine["EnabledState"];
+                var vmName = virtualMachine["ElementName"].ToString();
+                switch (vmState)
+                {
+                    case VmState.Enabled:
+                    case VmState.Disabled:
+                    case VmState.Offline:
+                    case VmState.Quiesce:
+                    case VmState.Reset:
+                        ShowToast(vmName, vmState, false);
+                        break;
+
+                    case VmState.RunningCritical:
+                    case VmState.OffCritical:
+                    case VmState.StoppingCritical:
+                    case VmState.SavedCritical:
+                    case VmState.PausedCritical:
+                    case VmState.StartingCritical:
+                    case VmState.ResetCritical:
+                    case VmState.SavingCritical:
+                    case VmState.PausingCritical:
+                    case VmState.ResumingCritical:
+                    case VmState.FastSavedCritical:
+                    case VmState.FastSavingCritical:
+                        ShowToast(vmName, vmState, true);
+                        break;
+                }
             }
         }
 
         #endregion
+            
+        #region Private Static
 
-        #region Private
-
-        private static AssemblyInstaller GetServiceInstaller() => new AssemblyInstaller(typeof(Service).Assembly, null) { UseNewContext = true };
-        private static void InstallService()
+        private static void ConnectToVm(string virtualMachineName)
         {
-            if (IsServiceInstalled())
-                return;
-
-            using (var installer = GetServiceInstaller())
+            var processInfo = new ProcessStartInfo
             {
-                var state = new Hashtable();
-                try
+                FileName = _vmConnectPath!,
+                Arguments = $"localhost \"{virtualMachineName}\"",
+            };
+            Process.Start(processInfo);
+        }
+        private static void GenerateContextMenu()
+        {
+            // Clear the context menu.
+            ContextMenu.MenuItems.Clear();
+
+            // Get all VMs.
+            var virtualMachines = GetVirtualMachines();
+
+            // Create a menu entry for each VM.
+            foreach (var virtualMachine in virtualMachines)
+            {
+                // Get the VM name.
+                var virtualMachineName = virtualMachine["ElementName"].ToString();
+
+                if (virtualMachineName != null)
                 {
-                    installer.Install(state);
-                    installer.Commit(state);
-                }
-                catch
-                {
-                    installer.Rollback(state);
+                    // Get the VM state.
+                    var virtualMachineStatus = (VmState)Convert.ToInt32(virtualMachine["EnabledState"]);
+
+                    // Generate the menu entry title for the VM.
+                    var virtualMachineMenuTitle = virtualMachineName;
+                    if (virtualMachineStatus != VmState.Disabled) // Stopped
+                    {
+                        virtualMachineMenuTitle += $" [{VmStateToString(virtualMachineStatus)}]";
+                    }
+
+                    // Create VM menu item.
+                    var virtualMachineMenu = new MenuItem(virtualMachineMenuTitle) { Name = virtualMachineName };
+                    var canResume = IsVmPaused(virtualMachineStatus); // Paused
+                    var canStart = IsVmOff(virtualMachineStatus) || IsVmSaved(virtualMachineStatus); // Stopped or Saved
+
+                    // Now generate control menu items for VM.
+
+                    // Connect
+                    if (_vmConnectPath != null)
+                    {
+                        var connectMenuItem = new MenuItem(ResourceHelper.Command_Connect);
+                        connectMenuItem.Click += (_, _) => ConnectToVm(virtualMachineName);
+                        virtualMachineMenu.MenuItems.Add(connectMenuItem);
+                        virtualMachineMenu.MenuItems.Add(new MenuItem("-"));
+                    }
+
+                    if (canStart)
+                    {
+                        // Start
+                        var startMenuItem = new MenuItem(ResourceHelper.Command_Start);
+                        startMenuItem.Click += StartMenuItem_Click;
+                        virtualMachineMenu.MenuItems.Add(startMenuItem);
+                    }
+                    else
+                    {
+                        // Turn Off
+                        var stopMenuItem = new MenuItem(ResourceHelper.Command_TurnOff);
+                        stopMenuItem.Click += TurnOffMenuItem_Click;
+                        virtualMachineMenu.MenuItems.Add(stopMenuItem);
+
+                        // Shut Down
+                        if (!canResume)
+                        {
+                            var shutMenuDownItem = new MenuItem(ResourceHelper.Command_ShutDown);
+                            shutMenuDownItem.Click += ShutDownMenuItem_Click;
+                            virtualMachineMenu.MenuItems.Add(shutMenuDownItem);
+                        }
+
+                        // Save
+                        var saveMenuStateItem = new MenuItem(ResourceHelper.Command_Save);
+                        saveMenuStateItem.Click += SaveMenuItem_Click;
+                        virtualMachineMenu.MenuItems.Add(saveMenuStateItem);
+
+                        virtualMachineMenu.MenuItems.Add(new MenuItem("-"));
+                        if (canResume)
+                        {
+                            // Resume
+                            var resumeMenuItem = new MenuItem(ResourceHelper.Command_Resume);
+                            resumeMenuItem.Click += ResumeMenuItem_Click;
+                            virtualMachineMenu.MenuItems.Add(resumeMenuItem);
+                        }
+                        else
+                        {
+                            // Pause
+                            var pauseMenuItem = new MenuItem(ResourceHelper.Command_Pause);
+                            pauseMenuItem.Click += PauseMenuItem_Click;
+                            virtualMachineMenu.MenuItems.Add(pauseMenuItem);
+                        }
+
+                        // Reset
+                        var resetMenuItem = new MenuItem(ResourceHelper.Command_Reset);
+                        resetMenuItem.Click += ResetMenuItem_Click;
+                        virtualMachineMenu.MenuItems.Add(resetMenuItem);
+                    }
+
+                    // Add VM menu item to root menu.
+                    ContextMenu.MenuItems.Add(virtualMachineMenu);
                 }
             }
+
+            if (virtualMachines.Any())
+            {
+                ContextMenu.MenuItems.Add(new MenuItem("-"));
+
+                // Create a root menu item for the VM.
+                var vmItem = new MenuItem("Strings.Menu_AllVirtualMachines");
+
+                var subItems = new List<MenuItem>();
+                var isOff = virtualMachines.Any(vm => IsVmOff((VmState)Convert.ToInt32(vm["EnabledState"])));
+                var isPaused = virtualMachines.Any(vm => IsVmPaused((VmState)Convert.ToInt32(vm["EnabledState"])));
+                var isRunning = virtualMachines.Any(vm => IsVmRunning((VmState)Convert.ToInt32(vm["EnabledState"])));
+                var isSaved = virtualMachines.Any(vm => IsVmSaved((VmState)Convert.ToInt32(vm["EnabledState"])));
+
+                // Start
+                if (isOff || isSaved)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_Start)); //MenuItemStartAll_Click));
+                }
+
+                // Turn Off
+                if (isRunning || isPaused)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_TurnOff)); //MenuItemStopAll_Click));
+                }
+
+                // Shut Down
+                if (isRunning)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_ShutDown)); //MenuItemShutdownAll_Click));
+                }
+
+                // Save
+                if (isRunning || isPaused)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_Save)); //MenuItemSaveAll_Click));
+                }
+
+                if (subItems.Any() && isRunning || isPaused)
+                {
+                    subItems.Add(new MenuItem("-"));
+                }
+
+                // Resume
+                if (isPaused)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_Resume)); //MenuItemResumeAll_Click));
+                }
+
+                // Pause
+                if (isRunning)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_Pause)); //MenuItemPauseAll_Click));
+                }
+
+                // Reset
+                if (isRunning || isPaused)
+                {
+                    subItems.Add(new MenuItem(ResourceHelper.Command_Reset)); //MenuItemResetAll_Click));
+                }
+
+                vmItem.MenuItems.AddRange(subItems.ToArray());
+
+                // Add the VM to the context menu.
+                ContextMenu.MenuItems.Add(vmItem);
+            }
+
+            // Add `Hyper-V Manager` menu item.
+            if (_vmManagerPath != null)
+            {
+                ContextMenu.MenuItems.Add(new MenuItem("-"));
+                var managerItem = new MenuItem("Hyper-V Manager");
+                managerItem.Click += (_, _) => OpenHyperVManager();
+                ContextMenu.MenuItems.Add(managerItem);
+            }
+
+            // Add `Exit` menu item.
+            ContextMenu.MenuItems.Add(new MenuItem("-"));
+            var exitItem = new MenuItem("Exit");
+            exitItem.Click += ExitMenuItem_Click;
+            ContextMenu.MenuItems.Add(exitItem);
+        
+        }
+        private static IEnumerable<ManagementObject> GetVirtualMachines(string? name = null)
+        {
+            // Create our WMI query string to get one virtual machine, or all virtual machines, from the list of machines configured
+            // on this system. If the 'name' parameter is null then we get all virtual machines, otherwise we look for a machine with
+            // a matching name.
+            var queryString = $"SELECT * FROM Msvm_ComputerSystem WHERE Caption LIKE 'Virtual Machine'"; // WHERE Name!='{Environment.MachineName}'";
+            if (name != null)
+            {
+                queryString += $" AND ElementName='{name}'";
+            }
+
+            // Create a WMI query object using the querystring we defined previously.
+            var queryObj = new ObjectQuery(queryString);
+
+            // Create a searcher object, passing in our search parameters as previously defined.
+            var vmSearcher = new ManagementObjectSearcher(WmiManagementScope, queryObj);
+
+            // Run the search, and cast the results to a list of ManagementObject.
+            return vmSearcher.Get().Cast<ManagementObject>().ToList();
+        }
+        private static bool IsVmCritical(VmState state)
+        {
+            // Determine if the VmState enum value is for a critical state.
+            return state switch
+            {
+                VmState.RunningCritical or VmState.OffCritical or VmState.PausedCritical or VmState.SavedCritical
+                or VmState.FastSavedCritical or VmState.StartingCritical or VmState.SavingCritical or VmState.FastSavingCritical
+                or VmState.StoppingCritical or VmState.PausingCritical or VmState.ResumingCritical or VmState.ResetCritical => true,
+                _ => false,
+            };
+        }
+        private static bool IsVmOff(VmState state)
+        {
+            // Determine if the VmState enum value is for an off state.
+            return state switch
+            {
+                VmState.Disabled or VmState.OffCritical => true,
+                _ => false,
+            };
+        }
+        private static bool IsVmPaused(VmState state)
+        {
+            // Determine if the VmState enum value is for a paused state.
+            return state switch
+            {
+                VmState.Paused or VmState.Quiesce or VmState.PausedCritical => true,
+                _ => false,
+            };
+        }
+        private static bool IsVmRunning(VmState state)
+        {
+            // Determine if the VmState enum value is for a running state.
+            return state switch
+            {
+                VmState.Enabled or VmState.RunningCritical => true,
+                _ => false,
+            };
+        }
+        private static bool IsVmSaved(VmState state)
+        {
+            // Determine if the VmState enum value is for a saved state.
+            return state switch
+            {
+                VmState.Suspended or VmState.Offline or VmState.SavedCritical or VmState.FastSaved or VmState.FastSavedCritical => true,
+                _ => false,
+            };
         }
         [STAThread]
-        private static void Main(string[] args)
+        private static void Main()
         {
-            // In order to keep the program compact and easily distributable
-            // everything is inside a single executable (both the tray icon
-            // and the Windows Service). As a result we need to detect in
-            // which context the application is running to determine what we
-            // need to do. If running as a Windows Service Environment.UserInteractive
-            // will return false.
-            UserInteractive = Environment.UserInteractive;
+            // Application setup.
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
 
-            // Check the host OS to determine whether we support it.
-            if (Environment.OSVersion.Version.Major < 6)
-                // This is an OS before Windows Vista, which is not supported.
-                UnsupportedOs();
-            else if (Environment.OSVersion.Version.Major == 6)
+            // Detect Hyper-V components.
+            _hyperVInstallFolder = @$"{Environment.GetEnvironmentVariable("ProgramFiles")}\Hyper-V\";
+            if (!Directory.Exists(_hyperVInstallFolder))
             {
-                // If the major version is 6 then we are looking at a version of Windows anywhere from
-                // Windows Vista/Server 2008 to Windows 8.1/Server 2012 R2.
-
-                // If the minor version is less than 2 then we are either on Windows Vista/Server 2008 (0) or
-                // Windows 7/Server 2008 R2 (1). In both of these cases, Hyper-V was not available for
-                // desktop versions of Windows, only server variants, so we need to check whether we are
-                // running on a server OS. If not, we let the user know that their OS is not supported.
-                if (Environment.OSVersion.Version.Minor < 2 && !NativeMethods.IsOS(29)) // 29 = OS_ANYSERVER
-                    UnsupportedOs();
+                ShowError("Hyper-V Tools not installed.");
+                Application.Exit();
+                return;
+            }
+            _vmConnectPath = $@"{Environment.GetEnvironmentVariable("SYSTEMROOT")}\System32\vmconnect.exe";
+            if (!File.Exists(_vmConnectPath))
+            {
+                _vmConnectPath = null;
+            }
+            _vmManagerPath = $@"{Environment.GetEnvironmentVariable("SYSTEMROOT")}\System32\virtmgmt.msc";
+            if (!File.Exists(_vmManagerPath))
+            {
+                _vmManagerPath = null;
             }
 
-            // If we get this far then we have passed the OS check so we can now proceed
-            // to run the application.
-            if (UserInteractive)
+            // Initialize our ResourceHelper.
+            ResourceHelper.Initialize(_hyperVInstallFolder);
+
+            // Show our tray icon.
+            NotifyIcon.Visible = true;
+            SetTrayIcon();
+
+            WmiManagementScope.Connect();
+            WmiEventWatcher.Start();
+
+            // Run the application.
+            Application.Run();
+        }
+        private static void OpenHyperVManager()
+        {
+            var processInfo = new ProcessStartInfo
             {
-                // We're running on the desktop, so run as a tray icon app.
+                FileName = @$"{Environment.GetEnvironmentVariable("SYSTEMROOT")}\System32\mmc.exe",
+                Arguments = _vmManagerPath!,
+                WorkingDirectory = _hyperVInstallFolder,
+                UseShellExecute = true,
+                Verb = @"runas"
+            };
+            Process.Start(processInfo);
+        }
+        private static bool RequestVmShutdown(string virtualMachineName)
+        {
+            // Get the WMI Management Object for the virtual machine we are interested in.
+            var virtualMachine = GetVirtualMachines(virtualMachineName).FirstOrDefault();
 
-                if (args.Length == 0)
+            // Check to see whether we found a matching virtual machine.
+            if (virtualMachine != null)
+            {
+                // If we found a matching virtual machine get the `Msvm_ShutdownComponent` for it.
+                var shutdowncomponent = virtualMachine.GetRelated("Msvm_ShutdownComponent").Cast<ManagementObject>().FirstOrDefault();
+
+                // Check to see whether we found a Shutdown Component
+                if (shutdowncomponent != null)
                 {
-                    // No arguments have been passed in, so we just run the tray icon application as normal.
+                    // Get the parameters for the InitiateShudown method
+                    var inParameters = shutdowncomponent.GetMethodParameters("InitiateShutdown");
 
-                    // Check if we are running as admin as we need admin rights to query Hyper-V using WMI. If
-                    // we are not running as admin check if the Hyper-V Quick Manager service is installed. If it
-                    // is then we are ok to run as non-admin as the service will do the heavy-lifting for us and
-                    // we just use WCF to grab the data from it and send commands to it.
-                    if (!NativeMethods.IsUserAnAdmin() && !IsServiceInstalled())
-                        RequiresAdmin();
+                    // Set the 'Force' and 'Reason' parameters.
+                    inParameters["Force"] = true;
+                    inParameters["Reason"] = ApplicationName;
 
-                    // Run our tray icon.
-                    Application.Run(new MainContext());
-                }
-                else if (args.Length == 1)
-                {
-                    // A single argument has been passed in, which is supported. We check to see if the argument
-                    // is valid and either take appropriate action, or return an error to the user if it is not
-                    // valid.
+                    // Invoke the method, passing in the parameters we just set.
+                    var outParameters = shutdowncomponent.InvokeMethod("InitiateShutdown", inParameters, null);
 
-                    switch (args[0])
+                    // Return the result of the method call.
+                    if (outParameters != null)
                     {
-                        case "/i":
-                        case "-i":
-                        case "--install":
-                            if (!NativeMethods.IsUserAnAdmin())
-                                RequiresAdminToInstall();
-
-                            InstallService();
-                            StartService();
-                            break;
-                        case "/u":
-                        case "-u":
-                        case "--uninstall":
-                            if (!NativeMethods.IsUserAnAdmin())
-                                RequiresAdminToInstall();
-
-                            StopService();
-                            UninstallService();
-                            break;
-                        default:
-                            UnsupportedArguments();
-                            break;
+                        return (StateChangeResponse)outParameters["ReturnValue"] is StateChangeResponse.CompletedwithNoError
+                                                                                 or StateChangeResponse.MethodParametersCheckedTransitionStarted;
                     }
                 }
-                else
-                    // If more than one argument has been passed in then we return an error to the user as this
-                    // is not supported.
-                    UnsupportedArguments();
+            }
+
+            // If we couldn't find a matching virtual machine then return `false`.
+            return false;
+        }
+        private static bool RequestVmStateChange(string virtualMachineName, VmState state)
+        {
+            // Get the WMI Management Object for the virtual machine we are interested in.
+            var virtualMachine = GetVirtualMachines(virtualMachineName).FirstOrDefault();
+
+            // Check to see whether we found a matching virtual machine.
+            if (virtualMachine != null)
+            {
+                // Get the parameters for the 'RequestStateChange' method.
+                var inParameters = virtualMachine.GetMethodParameters("RequestStateChange");
+
+                // Filter out the request as we only support a subset requesting a subset of all states.
+                if (state is VmState.Enabled  // Running
+                          or VmState.Disabled // Stopped
+                          or VmState.Offline  // Saved
+                          or VmState.Quiesce  // Paused
+                          or VmState.Reset)
+                {
+                    // Set the 'RequestedState' parameter to the desired state.
+                    inParameters["RequestedState"] = (ushort)state;
+
+                    // Fire off the request to change the state.
+                    var outParameters = virtualMachine.InvokeMethod("RequestStateChange", inParameters, null);
+
+                    // Return the result of the method call.
+                    if (outParameters != null)
+                    {
+                        return (StateChangeResponse)outParameters["ReturnValue"] is StateChangeResponse.CompletedwithNoError
+                                                                                 or StateChangeResponse.MethodParametersCheckedTransitionStarted;
+                    }
+                }
+            }
+
+            // If we couldn't find a matching virtual machine then return `false`.
+            return false;
+        }
+        private static void SetTrayIcon()
+        {
+            var iconWidth = PInvoke.GetTrayIconWidth(NotifyIcon.GetHandle());
+            Debug.Assert(iconWidth > 0, "Icon width is 0");
+            var iconSize = new Size(iconWidth, iconWidth);
+            NotifyIcon.Icon = new Icon(ResourceHelper.Icon_HyperV, iconSize);
+
+            Debug.WriteLine($"Icon size: {iconSize.Width}x{iconSize.Height}");
+        }
+        private static void ShowError(string heading, string text = "")
+        {
+            var taskDialogPage = new TaskDialogPage();
+            taskDialogPage.AllowCancel = false;
+            taskDialogPage.AllowMinimize = false;
+            taskDialogPage.Buttons = [TaskDialogButton.Close];
+            taskDialogPage.Caption = ApplicationName;
+            taskDialogPage.Heading = heading;
+            taskDialogPage.Icon = TaskDialogIcon.Error;
+            taskDialogPage.Text = text;
+            TaskDialog.ShowDialog(taskDialogPage);
+        }
+        private static void ShowToast(string virtualMachineName, VmState vmState, bool isCritical)
+        {
+            var status = VmStateToString(vmState);
+            if (Environment.OSVersion.Version.Major >= 10)
+            {
+                var toast = new ToastContentBuilder().AddHeader(virtualMachineName, virtualMachineName, new ToastArguments());
+
+                if (isCritical)
+                { 
+                    toast.AddText(ResourceHelper.Toast_CriticalState, AdaptiveTextStyle.Header);
+                }
+
+                toast.AddText(status)
+                     .Show();
             }
             else
             {
-                // We're running as a Windows Service, so start the service instance.
-
-                // Check if we are running as admin as we need admin rights to query Hyper-V using WMI.
-                if (!NativeMethods.IsUserAnAdmin())
-                    RequiresAdmin();
-
-                // Start the service
-                ServiceBase.Run(new Service());
-            }
-        }
-        private static void RequiresAdmin()
-        {
-            if (UserInteractive)
-                // We're running on the desktop so show the user a message box to indicate that
-                // we need admin rights.
-                ShowDialog(string.Format(Strings.Error_RequiresAdminDesktop_Text, ApplicationName), string.Format(Strings.Error_RequiresAdminDesktop_InstructionText, ApplicationName), TaskDialogStandardButtons.Ok, TaskDialogStandardIcon.Error);
-            else
-                // Log a message in the event log to indicate that we need admin rights.
-                GetEventLog().WriteEntry(string.Format(Strings.Error_RequiresAdminService, ServiceDisplayName), EventLogEntryType.Error, (int)EventLogEntryId.RequiresAdmin);
-
-#if !DEBUG
-            // Exit the application/service.
-            Environment.Exit(1);
-#endif
-        }
-        private static void RequiresAdminToInstall()
-        {
-            if (UserInteractive)
-                // We're running on the desktop so show the user a message box to indicate that
-                // we need admin rights to install the service.
-                ShowDialog(string.Format(Strings.Error_RequiresAdminToInstall_Text, ApplicationName), string.Format(Strings.Error_RequiresAdminToInstall_InstructionText, ApplicationName), TaskDialogStandardButtons.Ok, TaskDialogStandardIcon.Error);
-
-#if !DEBUG
-            // Exit the application/service.
-            Environment.Exit(1);
-#endif
-        }
-        private static void StartService()
-        {
-            if (!IsServiceInstalled())
-                return;
-
-            using (ServiceController controller = new ServiceController(ServiceName))
-            {
-                if (controller.Status != ServiceControllerStatus.Running)
+                if (isCritical)
                 {
-                    controller.Start();
-                    controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                    status = $"{ResourceHelper.Toast_CriticalState}\n{status}";
                 }
+                NotifyIcon.ShowBalloonTip(BalloonTipTimeout, virtualMachineName, status, isCritical ? ToolTipIcon.Error : ToolTipIcon.Info);
             }
         }
-        private static void StopService()
+        private static string VmStateToString(VmState state)
         {
-            if (!IsServiceInstalled())
-                return;
-
-            using (ServiceController controller = new ServiceController(ServiceName))
+            switch (state)
             {
-                if (controller.Status != ServiceControllerStatus.Stopped)
-                {
-                    controller.Stop();
-                    controller.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
-                }
-            }
-        }
-        private static void UninstallService()
-        {
-            if (!IsServiceInstalled())
-                return;
+                case VmState.Enabled:
+                    return ResourceHelper.State_Running;
+                case VmState.Disabled:
+                    return ResourceHelper.State_Off;
+                case VmState.Offline:
+                case VmState.FastSaved:
+                    return ResourceHelper.State_Saved;
+                case VmState.Quiesce:
+                    return ResourceHelper.State_Paused;
+                default:
+                    if ((int)state >= 32781 && (int)state <= 32792)
+                    {
+                        return ResourceHelper.State_Critical;
+                    }
 
-            using (var installer = GetServiceInstaller())
-            {
-                var state = new Hashtable();
-                installer.Uninstall(state);
-            }
-        }
-        private static void UnsupportedArguments()
-        {
-            if (UserInteractive)
-                // We're running on the desktop so show the user a message box to indicate this
-                // is an unsupported OS.
-                ShowDialog(string.Format(Strings.Error_Unsupported_Text, ApplicationName), string.Format(Strings.Error_Unsupported_InstructionText, ApplicationName), TaskDialogStandardButtons.Ok, TaskDialogStandardIcon.Error);
-
-#if !DEBUG
-            // Exit the application/service.
-            Environment.Exit(1);
-#endif
-        }
-        private static void UnsupportedOs()
-        {
-            if (UserInteractive)
-                // We're running on the desktop so show the user a message box to indicate this
-                // is an unsupported OS.
-                ShowDialog(string.Format(Strings.Error_Unsupported_Text, ApplicationName), string.Format(Strings.Error_Unsupported_InstructionText, ApplicationName), TaskDialogStandardButtons.Ok, TaskDialogStandardIcon.Error);
-            else
-                // Log a message in the event log to indicate that the service cannot run on this OS.
-                GetEventLog().WriteEntry(string.Format(Strings.Error_Unsupported_Text, ServiceDisplayName), EventLogEntryType.Error, (int)EventLogEntryId.UnsupportedOs);
-
-#if !DEBUG
-            // Exit the application/service.
-            Environment.Exit(1);
-#endif
-        }
-
-        #endregion
-
-        #region Internal
-
-        internal static EventLog GetEventLog()
-        {
-            // We're running as a service so initialise our event log class so that we can write
-            // to the event log.
-            var eventLog = new EventLog
-            {
-                Source = ServiceDisplayName,
-                Log = "Application"
-            };
-
-            // Add our event log source if it doesn't already exist.
-            if (!EventLog.SourceExists(eventLog.Source))
-                EventLog.CreateEventSource(eventLog.Source, eventLog.Log);
-
-            return eventLog;
-        }
-        internal static bool IsServiceInstalled() => ServiceController.GetServices("localhost").Any(s => s.ServiceName == ServiceName);
-        internal static bool IsServiceRunning()
-        {
-            using (var controller = new ServiceController(ServiceName))
-            {
-                if (!IsServiceInstalled())
-                    return false;
-
-                return controller.Status == ServiceControllerStatus.Running;
-            }
-        }
-        internal static TaskDialogResult ShowDialog(string text, string instructionText, TaskDialogStandardButtons buttons, TaskDialogStandardIcon icon)
-        {
-            // Create our task dialog instance - we use 'using' to take care
-            // of disposing of the object when we're done with it.
-            using (var taskDialog = new TaskDialog())
-            {
-                // Get the AssemblyTitle attribute of the project to automatically
-                // give the dialog a caption matching the program name.
-                taskDialog.Caption = ApplicationName;
-
-                // Set the remaining properties on the dialog.
-                taskDialog.Icon = icon;
-                taskDialog.InstructionText = instructionText;
-                taskDialog.StandardButtons = buttons;
-                taskDialog.StartupLocation = TaskDialogStartupLocation.CenterOwner;
-                taskDialog.Text = text;
-
-                // Add a handler to the dialog opening event - this is to fix
-                // a bug with the task dialog implementation.
-                taskDialog.Opened += TaskDialog_Opened;
-                try
-                {
-                    // Show the dialog and return the result.
-                    return taskDialog.Show();
-                }
-                finally
-                {
-                    // Remove our handler for the opening event.
-                    taskDialog.Opened -= TaskDialog_Opened;
-                }
+                    return state.ToString();
             }
         }
 

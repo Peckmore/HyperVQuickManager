@@ -1,12 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-namespace HyperVQuickManager
+﻿namespace HyperVTray
 {
-    /// <summary>
-    /// Represents the possible responses from requesting a Virtual Machine to change state.
-    /// </summary>
-    [SuppressMessage("ReSharper", "UnusedMember.Global")]
-    public enum StateChangeResponse : uint
+    internal enum StateChangeResponse : uint
     {
         CompletedwithNoError = 0,
         MethodParametersCheckedTransitionStarted = 4096,

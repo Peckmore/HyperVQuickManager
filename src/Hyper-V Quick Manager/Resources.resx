@@ -117,23 +117,71 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="Command_Connect" xml:space="preserve">
+    <value>xxC&amp;amp;onnect...</value>
+  </data>
+  <data name="Command_Pause" xml:space="preserve">
+    <value>xx&amp;amp;Pause</value>
+  </data>
+  <data name="Command_Reset" xml:space="preserve">
+    <value>xx&amp;amp;Reset</value>
+  </data>
+  <data name="Command_Resume" xml:space="preserve">
+    <value>xxRes&amp;amp;ume</value>
+  </data>
+  <data name="Command_Save" xml:space="preserve">
+    <value>xx&amp;amp;Save</value>
+  </data>
+  <data name="Command_ShutDown" xml:space="preserve">
+    <value>xxShut Do&amp;amp;wn...</value>
+  </data>
+  <data name="Command_Start" xml:space="preserve">
+    <value>xx&amp;amp;Start</value>
+  </data>
+  <data name="Command_TurnOff" xml:space="preserve">
+    <value>xx&amp;amp;Turn Off...</value>
+  </data>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="TrayIconOverlay_Critical" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TrayIconOverlay_Critical.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="Icon_HyperV" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\HyperV.ico;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="TrayIconOverlay_Paused" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TrayIconOverlay_Paused.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="Message_PauseVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to pause the selected virtual machine(s).</value>
   </data>
-  <data name="TrayIconOverlay_Running" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TrayIconOverlay_Running.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="Message_PowerOffVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to turn off the selected virtual machine(s).</value>
   </data>
-  <data name="TrayIcon_Win10" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TrayIcon_Win10.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="Message_ResetVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to reset the selected virtual machine(s).</value>
   </data>
-  <data name="TrayIcon_Win7" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\resources\trayicon_win7.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="Message_ResumeVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to resume the selected virtual machine(s).</value>
   </data>
-  <data name="TrayIcon_WinVista" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TrayIcon_WinVista.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="Message_SaveStateVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to save the state of the selected virtual machine(s).</value>
+  </data>
+  <data name="Message_ShutDownVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to shut down the virtual machine(s).</value>
+  </data>
+  <data name="Message_StartVMFailed" xml:space="preserve">
+    <value>xxAn error occurred while attempting to start the selected virtual machine(s).</value>
+  </data>
+  <data name="State_Critical" xml:space="preserve">
+    <value>StateCritical</value>
+  </data>
+  <data name="State_Off" xml:space="preserve">
+    <value>StateOff</value>
+  </data>
+  <data name="State_Paused" xml:space="preserve">
+    <value>StatePaused</value>
+  </data>
+  <data name="State_Running" xml:space="preserve">
+    <value>StateRunning</value>
+  </data>
+  <data name="State_Saved" xml:space="preserve">
+    <value>StateSaved</value>
+  </data>
+  <data name="Toast_CriticalState" xml:space="preserve">
+    <value>Virtual Machine is in a critical state.</value>
   </data>
 </root>

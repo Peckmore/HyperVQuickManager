@@ -1,9 +1,9 @@
-﻿namespace HyperVQuickManager
+﻿namespace HyperVTray
 {
     /// <summary>
     /// Represents the possible states a Hyper-V Virtual Machine can be in or requested to go to. This list is taken from both the v1 and v2 WMI providers, and consists of all states that can be set or returned.
     /// </summary>
-    public enum VmState
+    internal enum VmState : ushort
     {
         Unknown = 0, // The state of the element could not be determined.
         Other = 1,
@@ -26,7 +26,7 @@
         Resuming = 32777, // In version 1 (V1) of Hyper-V, corresponds to EnabledStateResuming. State transition from Paused to Running.
         FastSaved = 32779, // Corresponds to EnabledStateFastSuspend.
         FastSaving = 32780, // Corresponds to EnabledStateFastSuspending. State transition from Running to FastSaved.
-        
+
         // The following values represent critical states:
         RunningCritical = 32781,
         OffCritical = 32782,

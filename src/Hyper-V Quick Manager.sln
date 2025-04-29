@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27703.2042
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hyper-V Quick Manager", "Hyper-V Quick Manager\Hyper-V Quick Manager.csproj", "{25418752-0F39-4CC6-9168-F410F4B50B6A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "System.Windows.Forms.Legacy", "..\..\System.Windows.Forms.Legacy\src\System.Windows.Forms.Legacy\System.Windows.Forms.Legacy.csproj", "{E4EB1599-7FA7-4BF1-9ADB-1A957488A8D7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,11 +17,15 @@ Global
 		{25418752-0F39-4CC6-9168-F410F4B50B6A}.Debug|x64.Build.0 = Debug|x64
 		{25418752-0F39-4CC6-9168-F410F4B50B6A}.Release|x64.ActiveCfg = Release|x64
 		{25418752-0F39-4CC6-9168-F410F4B50B6A}.Release|x64.Build.0 = Release|x64
+		{E4EB1599-7FA7-4BF1-9ADB-1A957488A8D7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E4EB1599-7FA7-4BF1-9ADB-1A957488A8D7}.Debug|x64.Build.0 = Debug|Any CPU
+		{E4EB1599-7FA7-4BF1-9ADB-1A957488A8D7}.Release|x64.ActiveCfg = Release|Any CPU
+		{E4EB1599-7FA7-4BF1-9ADB-1A957488A8D7}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {FE858108-E583-414F-95D4-BCE0B1FC8D16}
+		SolutionGuid = {37865059-A105-443C-A640-836C48AD5EDF}
 	EndGlobalSection
 EndGlobal

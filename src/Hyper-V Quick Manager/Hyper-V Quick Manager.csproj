@@ -1,166 +1,52 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.30729</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{25418752-0F39-4CC6-9168-F410F4B50B6A}</ProjectGuid>
-    <OutputType>WinExe</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>HyperVQuickManager</RootNamespace>
-    <AssemblyName>hyperv-tray</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <FileUpgradeFlags>
-    </FileUpgradeFlags>
-    <UpgradeBackupLocation>
-    </UpgradeBackupLocation>
-    <OldToolsVersion>3.5</OldToolsVersion>
-    <TargetFrameworkProfile />
-  </PropertyGroup>
-  <PropertyGroup>
-    <StartupObject>HyperVQuickManager.Program</StartupObject>
-  </PropertyGroup>
-  <PropertyGroup>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-  </PropertyGroup>
-  <PropertyGroup>
-    <ApplicationIcon>Resources\TrayIcon_Win7.ico</ApplicationIcon>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <DebugType>full</DebugType>
-    <PlatformTarget>x64</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>x64</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Configuration.Install" />
-    <Reference Include="System.Core">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Management" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.ServiceModel" />
-    <Reference Include="System.ServiceProcess" />
-    <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="EventLogEntryId.cs" />
-    <Compile Include="IVmManagerCallback.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\Common\DialogControl.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\Common\DialogControlCollection.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\Common\DialogsDefaults.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\Common\IDialogControlHost.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialog.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogBar.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogButton.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogButtonBase.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogClosingEventArgs.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogCommandLink.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogControl.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogDefaults.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogExpandedInfoMode.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogHyperlinkClickedEventArgs.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogProgressBar.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogProgressBarState.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogRadioButton.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogResult.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogStandardButton.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogStandardIcon.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogStartupLocation.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Dialogs\TaskDialogs\TaskDialogTickEventArgs.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\CoreErrorHelper.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\CoreHelpers.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\CoreNativeMethods.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\Dialogs\DialogShowState.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\TaskDialogs\NativeTaskDialog.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\TaskDialogs\NativeTaskDialogSettings.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\TaskDialogs\TaskDialogNativeMethods.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Interop\WindowMessage.cs" />
-    <Compile Include="WindowsApiCodePack-Core\Core\Resources\LocalizedMessages.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>LocalizedMessages.resx</DependentUpon>
-    </Compile>
-    <Compile Include="IVmManager.cs" />
-    <Compile Include="MainContext.cs" />
-    <Compile Include="NativeMethods.cs" />
-    <Compile Include="Program.cs" />
-    <Compile Include="WindowsService\ServiceInstaller.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="WindowsService\ServiceInstaller.Designer.cs">
-      <DependentUpon>ServiceInstaller.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <Compile Include="Properties\Strings.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Strings.resx</DependentUpon>
-    </Compile>
-    <Compile Include="StateChangeResponse.cs" />
-    <Compile Include="WindowsService\Service.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="WindowsService\Service.Designer.cs">
-      <DependentUpon>Service.cs</DependentUpon>
-    </Compile>
-    <Compile Include="VmOverview.cs" />
-    <Compile Include="VmState.cs" />
-    <Compile Include="VmManager.cs" />
-    <EmbeddedResource Include="WindowsApiCodePack-Core\Core\Resources\LocalizedMessages.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>LocalizedMessages.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Properties\Strings.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Strings.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\TrayIcon_WinVista.ico" />
-    <None Include="Resources\TrayIconOverlay_Critical.ico" />
-    <None Include="Resources\TrayIconOverlay_Paused.ico" />
-    <None Include="Resources\TrayIconOverlay_Running.ico" />
-    <None Include="Resources\TrayIcon_Win10.ico" />
-    <Content Include="Resources\TrayIcon_Win7.ico" />
-    <None Include="app.manifest">
-      <SubType>Designer</SubType>
-    </None>
-  </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0-windows10.0.17763.0</TargetFramework>
+		<OutputType>WinExe</OutputType>
+		<RootNamespace>HyperVTray</RootNamespace>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<UseWindowsForms>true</UseWindowsForms>
+		<nullable>enable</nullable>
+		<ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+		<PublishSingleFile>true</PublishSingleFile>
+		<Platforms>x64</Platforms>
+		<ApplicationIcon>Resources\HyperV.ico</ApplicationIcon>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+		<Title>Hyper-V Tray</Title>
+		<AssemblyTitle>Hyper-V Tray</AssemblyTitle>
+		<Product>Hyper-V Tray</Product>
+		<Authors>Simon Peckmore</Authors>
+		<IsPublishable>False</IsPublishable>
+		<AssemblyName>hvtray</AssemblyName>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Content Include="Resources\HyperV.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+		<PackageReference Include="System.Management" Version="9.0.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\System.Windows.Forms.Legacy\src\System.Windows.Forms.Legacy\System.Windows.Forms.Legacy.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Resources.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Resources.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Update="Resources.resx">
+			<Generator>ResXFileCodeGenerator</Generator>
+			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
+
 </Project>
