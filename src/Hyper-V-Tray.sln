@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hyper-V Quick Manager", "Hyper-V Quick Manager\Hyper-V Quick Manager.csproj", "{25418752-0F39-4CC6-9168-F410F4B50B6A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hyper-V-Tray", "Hyper-V-Tray\Hyper-V-Tray.csproj", "{25418752-0F39-4CC6-9168-F410F4B50B6A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "System.Windows.Forms.Legacy", "..\..\System.Windows.Forms.Legacy\src\System.Windows.Forms.Legacy\System.Windows.Forms.Legacy.csproj", "{E4EB1599-7FA7-4BF1-9ADB-1A957488A8D7}"
 EndProject
